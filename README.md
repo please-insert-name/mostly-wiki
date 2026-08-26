@@ -70,7 +70,7 @@ Damit der Assistent über mehrere Sitzungen hinweg dazulernt, wird eine `prefere
 
 - **Ausgegebene Empfehlungen** — was wurde wann empfohlen, inkl. Kontext und (falls vorhanden)
   Nutzer-Feedback dazu.
-- **Harte Einschränkungen** — z. B. Unverträglichkeiten, die Ergebnisse aktiv ausschließen und
+- **Harte Einschränkungen** — z. B. Unverträglichkeiten, die Ergebnisse bei der Suche nach Kostrezepten aktiv ausschließen und
   sich (wo möglich) mit einer `additional-information-retrieval`-Kategorie verzahnen, statt bei
   jeder Anfrage erneut abgefragt zu werden.
 - **Weiche Vorlieben** — beeinflussen die Auswahl/Reihenfolge von Empfehlungen, schließen aber
@@ -79,11 +79,3 @@ Damit der Assistent über mehrere Sitzungen hinweg dazulernt, wird eine `prefere
 Diese Datei wird vor jeder Antwort geprüft und nach jeder Antwort fortgeschrieben — der
 Assistent baut so über die Zeit ein Nutzerprofil auf, ohne dass Vorlieben oder Einschränkungen
 wiederholt erklärt werden müssen.
-
-## Beispielprojekt: Vegan Cooking
-
-Die aktuelle Instanz dieses Wikis ist mit veganen Kochbüchern befüllt (`wiki/vegan-cooking/`).
-`CLAUDE.md` enthält für dieses Beispiel konkrete Aufgaben, Beispielfragen und einen 182 Fragen
-umfassenden Testplan — als Referenz dafür, wie man den generischen Aufbau oben für eine eigene
-Domäne konkretisiert (eigene Rolle, eigenes Schema, eigene Zusatzkategorien, eigene
-Präferenzfelder).
