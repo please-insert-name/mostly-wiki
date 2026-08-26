@@ -1,4 +1,4 @@
-# Strong Wiki – Übersicht
+# Mostly Wiki – Übersicht
 
 Dieses Projekt baut einen Assistenten, der Fragen ausschließlich auf Basis einer selbst
 aufgebauten, aus Quelldokumenten kompilierten Wissensbasis (einem "Wiki") beantwortet —
