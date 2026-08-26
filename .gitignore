@@ -1,0 +1,8 @@
+# Nur Code/Doku versionieren – alle Daten-/Ausgabeverzeichnisse (sources/, markdown/,
+# raw/, wiki/, outputs/, library/, ...) bleiben unversioniert und werden von der
+# Pipeline (siehe README.md) bei Bedarf neu erzeugt.
+/*
+!/.agents/
+!/CLAUDE.md
+!/README.md
+!/.gitignore
