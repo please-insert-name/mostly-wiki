@@ -64,3 +64,8 @@ Im Betrieb ist es ein ganz normales Gespräch: Ich frage nach einem schnellen Ab
 ## Fazit
 
 Damit ist die erste Version fertig, und ich werde ab jetzt wirklich damit arbeiten. Der interessante Teil beginnt aus meiner Sicht aber erst jetzt: Nicht die Architektur selbst ist das Ziel, sondern der eingebaute Mechanismus, mit dem sie sich aus echtem, alltäglichem Gebrauch heraus — nachvollziehbar und mit mir gemeinsam — weiterentwickelt.
+
+## Quellen
+`MarkItDown` (https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)
+`Karpathy-Wiki` (https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)
+`Compiling Agent Experience into Persistent Knowledge for Skill Evolution` (https://arxiv.org/pdf/2608.27454v1)
