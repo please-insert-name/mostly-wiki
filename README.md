@@ -78,24 +78,33 @@ Vorfilterung/Volltextsuche/Artikellektüre gewählt wird) steht in `CLAUDE.md` u
 
 ## 4. Skill Evolution
 
+Orientiert sich an WikiSkill: `Compiling Agent Experience into Persistent Knowledge for Skill 
+Evolution` (https://arxiv.org/pdf/2608.27454v1)
+
 Skills ändern sich hier nie "leise" — jede Schema- oder Verhaltensänderung durchläuft dieselbe
 Zwei-Stufen-Disziplin, die `retrieval-index`/`additional-information-retrieval` schon für
 Schema-Erweiterungen vorschreiben (Beispielfragen sammeln → Schema vorschlagen → Freigabe
 einholen → erst dann implementieren). `LEARNED_LESSONS.md` (Projekt-Root) ist die dafür nötige
 Zwischenablage: Beobachtungen aus dem täglichen Gebrauch werden dort unter "Neue Erkenntnisse"
-gesammelt (Schema: Datum | betroffener Skill | Beobachtung | ggf. Vorschlag), bevor sie zu einer
-tatsächlichen Skill-Änderung führen. So kann sich über mehrere Sitzungen Evidenz ansammeln, statt
-auf einen einzelnen Vorfall überzureagieren.
+gesammelt, bevor sie zu einer tatsächlichen Skill-Änderung führen. So kann sich über mehrere
+Sitzungen Evidenz ansammeln, statt auf einen einzelnen Vorfall überzureagieren. Angelehnt an
+SkillOpt (`Executive Strategy for Self-Evolving Agent Skills`, https://arxiv.org/abs/2605.23904)
+trägt jeder Eintrag einen **begrenzten, konkreten Edit-Vorschlag** (Add/Delete/Replace an einer
+genannten Datei/Stelle, plus Impact-Einstufung) statt offener Prosa — mit dem Unterschied, dass
+die "Bewertung" hier menschliche Rücksprache statt eines automatischen Validierungs-Scores ist,
+da kein Benchmark-Signal existiert. Volles Schema als Kommentar in `LEARNED_LESSONS.md`.
 
-Verarbeitung ist ein bewusster, protokollierter Schritt (auf Zuruf, oder proaktiv bevor ein Skill
-substantiell geändert wird) — nie ein automatischer Trigger: pro Eintrag wird entschieden, ob eine
-Änderung gerechtfertigt ist, diese wird umgesetzt (inkl. erneuter Freigabe bei Schema-relevanten
-Fällen), und der Eintrag wandert mit Verweis auf die Änderung nach "Bereits verarbeitete
-Erkenntnisse". Auch "kein Änderungsbedarf" zählt als gültige Verarbeitung. Zwei reale Beispiele
-stehen bereits in `LEARNED_LESSONS.md`: ein Datenverlust durch ein unversioniertes Schema-Feld
-(behoben durch Aufnahme ins versionierte `SCHEMA_SQL`) und eine Präferenzen-Filterlücke in der
-semantischen Suche (behoben durch fest im Code verankerte statt nur dokumentierte Filterung — s.
-Skill `semantic-processing`). Details zum Workflow stehen in `CLAUDE.md` unter `## SKILL
+Verarbeitung ist ein bewusster, protokollierter Schritt — nie ein automatischer Trigger, und nie
+eigenmächtig ohne Rücksprache. Zu Beginn jeder neuen Session werden offene Einträge kurz
+gesichtet und dem Nutzer zusammengefasst; zusätzlich auf Zuruf oder proaktiv bevor ein Skill
+substantiell geändert wird. Nach Rücksprache wandert jeder Eintrag mit kurzer Begründung entweder
+nach "Bereits verarbeitete Erkenntnisse" (inkl. Verweis auf die vorgenommene Änderung; bei
+Schema-relevanten Fällen weiterhin mit eigener Freigabe) oder nach "Nicht umgesetzte
+Erkenntnisse" (mit Begründung, warum verworfen) — nichts bleibt unentschieden liegen. Zwei reale
+Beispiele stehen bereits in `LEARNED_LESSONS.md`: ein Datenverlust durch ein unversioniertes
+Schema-Feld (behoben durch Aufnahme ins versionierte `SCHEMA_SQL`) und eine Präferenzen-Filterlücke
+in der semantischen Suche (behoben durch fest im Code verankerte statt nur dokumentierte Filterung
+— s. Skill `semantic-processing`). Details zum Workflow stehen in `CLAUDE.md` unter `## SKILL
 EVOLUTION`.
 
 ### Präferenzen und Feedback erfassen

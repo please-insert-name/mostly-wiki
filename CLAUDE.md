@@ -11,6 +11,7 @@ SQLite Datenbank für effiziente Keyword-Suchen.
 Greife bzgl. Rezepten ausschließlich auf die Informationen der Datenbasis zu. Greife nicht auf eigenes trainiertes Wissen zu.
 
 **Workflow**
+- Zu Beginn einer neuen Session einmalig: offene Einträge in `LEARNED_LESSONS.md` prüfen (s. `# SKILL EVOLUTION` unten) — bei Bedarf Rücksprache mit dem Nutzer halten, bevor die eigentliche Anfrage bearbeitet wird.
 - Benutzerfrage analysieren
 - Formuliere die Suchbegriffe und Fragen auf Englisch (Sprache des Wikis).
 - Prüfe preferences.md
@@ -62,12 +63,15 @@ Erkenntnisse aus dem täglichen Umgang mit dem System werden in `LEARNED_LESSONS
 ## Wann protokollieren
 - Wenn sich ein Skill, ein Filter oder eine Annahme über das Wiki-Schema als lückenhaft, falsch oder überraschend herausstellt (z. B. ein Filter, der etwas durchlässt, das er nicht sollte; ein stiller Datenverlust; ein Workflow-Schritt, der in der Praxis regelmäßig übersprungen/vergessen wird)
 - Nicht bei jeder Anfrage — nur bei Erkenntnissen, die über den aktuellen Einzelfall hinaus relevant sind
-- Eintrag unter "## Neue Erkenntnisse" in `LEARNED_LESSONS.md` anlegen; Schema (Datum | Skill/Datei | Beobachtung | Vorschlag) steht dort als Kommentar
+- Eintrag unter "## Neue Erkenntnisse" in `LEARNED_LESSONS.md` anlegen. Jeder Eintrag braucht einen **begrenzten, konkreten Edit-Vorschlag** (Add/Delete/Replace an einer genannten Datei/Stelle), keine offene Prosa-Idee — angelehnt an SkillOpts Konzept begrenzter, bewerteter Edits (arXiv:2605.23904); die "Bewertung" ist hier menschliche Rücksprache statt eines automatischen Validierungs-Scores, da kein Benchmark-Signal existiert. Volles Schema (inkl. Impact-Einstufung) steht als Kommentar in `LEARNED_LESSONS.md`.
 
 ## Wann sichten/verarbeiten
-- Auf Zuruf des Nutzers (z. B. "prüfe LEARNED_LESSONS.md", "skill evolution")
-- Proaktiv, bevor ein Skill substantiell geändert wird: zuerst offene Einträge zu diesem Skill in `LEARNED_LESSONS.md` durchsehen
-- Verarbeiten heißt: pro Eintrag entscheiden, ob eine Änderung an SKILL.md/CLAUDE.md/Code gerechtfertigt ist (bei Schema-relevanten Änderungen weiterhin Rückfrage/Freigabe einholen, s. `retrieval-index/SKILL.md`), diese umsetzen, und den Eintrag mit kurzem Verweis auf die vorgenommene Änderung nach "## Bereits verarbeitete Erkenntnisse" verschieben. "Kein Änderungsbedarf" ist ebenfalls eine gültige, protokollierte Verarbeitung — nicht stillschweigend ignorieren.
+- **Zu Beginn jeder neuen Session** (nicht bei jeder einzelnen Nutzerfrage): kurz prüfen, ob unter "## Neue Erkenntnisse" in `LEARNED_LESSONS.md` offene Einträge liegen. Falls ja: dem Nutzer knapp zusammenfassen (Beobachtung + Edit-Vorschlag + Impact) und pro Eintrag Rücksprache halten, bevor irgendetwas umgesetzt wird — nie eigenmächtig anwenden oder verwerfen.
+- Zusätzlich auf Zuruf des Nutzers (z. B. "prüfe LEARNED_LESSONS.md", "skill evolution") oder proaktiv, bevor ein Skill substantiell geändert wird: offene Einträge zu diesem Skill zuerst durchsehen.
+- Nach Rücksprache pro Eintrag:
+  - **Umsetzen:** den vorgeschlagenen Edit anwenden (bei Schema-relevanten Änderungen weiterhin die übliche Freigabe/Rückfrage einholen, s. `retrieval-index/SKILL.md`), dann den Eintrag mit kurzem Verweis auf die vorgenommene Änderung nach "## Bereits verarbeitete Erkenntnisse" verschieben.
+  - **Verwerfen:** den Eintrag mit kurzer Begründung (`**Verworfen:** ...`) nach "## Nicht umgesetzte Erkenntnisse" verschieben — nicht einfach löschen, die Entscheidung bleibt nachvollziehbar.
+- Kein Eintrag bleibt nach Rücksprache unverändert unter "Neue Erkenntnisse" stehen — jede Entscheidung (umsetzen oder verwerfen) wird protokolliert.
 
 # AUFGABEN
 Beispielaufgaben zum Thema "vegan cooking"
