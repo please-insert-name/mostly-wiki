@@ -53,6 +53,27 @@ Usage:
         improving that category's classification rules), so it can be
         cleanly reclassified from scratch. Other categories are untouched.
 
+    python retrieval_index.py embed [--model NAME] [wiki_root]
+        semantic-processing: compute sentence embeddings for every item
+        missing one (or whose source text changed since it was last
+        embedded), using a local sentence-transformers model — see
+        ../../semantic-processing/SKILL.md. Incremental and safe to rerun,
+        same pattern as `classify`. Requires the `sentence-transformers`
+        package (not a hard dependency of this script otherwise).
+
+    python retrieval_index.py similar <item_id> [--top-k N] [--raw] [wiki_root]
+        semantic-processing: rank every other embedded item by cosine
+        similarity to <item_id> and print the top N (default 10). Requires
+        `embed` to have been run first. By default also enforces this
+        project's hard exclusions from wiki/preferences.md (curated
+        ingredient_intolerances + histamine_high/fructose_high allergen
+        tags) — candidates violating one are silently dropped from
+        ranking, with a note on how many were hidden. Pass --raw to see
+        the unfiltered ranking instead (e.g. for debugging). Even
+        filtered, this is a candidate shortlist like `query`, not a final
+        answer — read the actual articles before presenting "similar
+        recipes" to the user.
+
 wiki_root defaults to "wiki" (relative to the current working directory).
 """
 import hashlib
@@ -109,7 +130,12 @@ CREATE TABLE item_ingredients (
     id INTEGER PRIMARY KEY,   -- stable hash of (article, anchor, position, line_text)
     item_id INTEGER NOT NULL REFERENCES items(id),
     sub_component TEXT,
-    line_text TEXT NOT NULL
+    line_text TEXT NOT NULL,
+    -- Canonical ingredient this line refers to, if recognized — see
+    -- INGREDIENTS_SCHEMA_SQL below and _relink_ingredients(), which
+    -- (re)computes this column mechanically at the end of every rebuild
+    -- (word-boundary, plural-tolerant match against `ingredients`).
+    base_ingredient_id INTEGER REFERENCES ingredients(id)
 );
 
 -- Free-text search: title = heading text, body = section's source text
@@ -120,6 +146,60 @@ CREATE VIRTUAL TABLE items_fts USING fts5(
     item_id UNINDEXED
 );
 """
+
+# --- ingredient vocabulary / linking ---------------------------------------
+# `ingredients` holds one row per canonical ingredient name (e.g. "tomato",
+# "sun-dried tomato"). `rebuild` creates it if missing but — unlike
+# MECHANICAL_TABLES — never drops it, so a curated vocabulary survives
+# future rebuilds. item_ingredients.base_ingredient_id (see SCHEMA_SQL
+# above) links each ingredient line to its canonical entry when one is
+# recognized; that link is purely mechanical (word-boundary + plural-
+# tolerant text match, no judgment call), so rebuild() recomputes it for
+# every item_ingredients row right after repopulating that table (see
+# _relink_ingredients()) — it can never again go silently missing/stale
+# the way it did before this table was tracked here (see project history:
+# an earlier ad-hoc build of this column lived only in the live database,
+# not in any versioned schema, and was lost by a rebuild that predated
+# this block).
+INGREDIENTS_SCHEMA_SQL = """
+CREATE TABLE IF NOT EXISTS ingredients (
+    id INTEGER PRIMARY KEY,
+    name TEXT UNIQUE NOT NULL
+);
+"""
+
+
+def _relink_ingredients(cur: sqlite3.Cursor) -> int:
+    """(Re)compute item_ingredients.base_ingredient_id for every row,
+    matching line_text against `ingredients.name` word-boundary-wise,
+    tolerant of a trailing plural "s"/"es" on the (often singular)
+    canonical name. Longest name first so multi-word/more specific
+    canonical ingredients win over shorter substrings that would also
+    match (e.g. "sun-dried tomato" over plain "tomato"). Purely
+    mechanical — no judgment call, safe to rerun/recompute from scratch
+    any time `ingredients` or item_ingredients changes."""
+    ingredients = cur.execute("SELECT id, name FROM ingredients").fetchall()
+    if not ingredients:
+        return 0
+    ingredients_sorted = sorted(ingredients, key=lambda r: len(r[1]), reverse=True)
+    patterns = [
+        (ing_id, re.compile(r"\b" + re.escape(name) + r"(?:es|s)?\b", re.IGNORECASE))
+        for ing_id, name in ingredients_sorted
+    ]
+
+    rows = cur.execute("SELECT id, line_text FROM item_ingredients").fetchall()
+    updates = []
+    for row_id, text in rows:
+        for ing_id, pat in patterns:
+            if pat.search(text):
+                updates.append((ing_id, row_id))
+                break
+
+    cur.executemany(
+        "UPDATE item_ingredients SET base_ingredient_id = ? WHERE id = ?", updates
+    )
+    return len(updates)
+
 
 # --- additional-information-retrieval companion tables --------------------
 # Populated by the `classify`/`mark-classified` commands, NOT by `rebuild`
@@ -149,6 +229,24 @@ CREATE TABLE IF NOT EXISTS classified_items (
     item_id INTEGER NOT NULL REFERENCES items(id),
     category TEXT NOT NULL,
     PRIMARY KEY (item_id, category)
+);
+"""
+
+# --- semantic-processing companion table -----------------------------------
+# Populated by the `embed` command, NOT by `rebuild` — computing embeddings
+# for the whole corpus is comparatively expensive (a local model pass per
+# item), same reasoning as ingredient_tags above. One row per item; `embed`
+# is incremental (only (re)computes rows missing or whose source_hash no
+# longer matches items_fts.body), so it's safe to rerun after every ingest
+# instead of needing a separate reset step. See ../../semantic-processing/SKILL.md.
+SEMANTIC_SCHEMA_SQL = """
+CREATE TABLE IF NOT EXISTS item_embeddings (
+    item_id INTEGER PRIMARY KEY REFERENCES items(id),
+    model TEXT NOT NULL,        -- sentence-transformers model name used
+    dim INTEGER NOT NULL,
+    vector BLOB NOT NULL,       -- float32, little-endian, dim * 4 bytes
+    source_hash TEXT NOT NULL,  -- sha256 of the embedded text, staleness check
+    computed_at TEXT NOT NULL   -- ISO date, for auditability
 );
 """
 
@@ -466,7 +564,9 @@ def rebuild(wiki_root: Path) -> None:
         for table in MECHANICAL_TABLES:
             cur.execute(f"DROP TABLE IF EXISTS {table}")
         cur.executescript(SCHEMA_SQL)
+        cur.executescript(INGREDIENTS_SCHEMA_SQL)
         cur.executescript(ADDITIONAL_INFO_SCHEMA_SQL)
+        cur.executescript(SEMANTIC_SCHEMA_SQL)
 
         rows_by_table: dict[str, list[dict]] = {}
         for table, columns in extract_records(wiki_root):
@@ -485,6 +585,8 @@ def rebuild(wiki_root: Path) -> None:
             )
             total += len(rows)
 
+        linked = _relink_ingredients(cur)
+
         cur.execute(
             "DELETE FROM ingredient_tags WHERE ingredient_id NOT IN "
             "(SELECT id FROM item_ingredients)"
@@ -494,14 +596,26 @@ def rebuild(wiki_root: Path) -> None:
             "DELETE FROM classified_items WHERE item_id NOT IN (SELECT id FROM items)"
         )
         orphaned_marks = cur.rowcount
+        cur.execute(
+            "DELETE FROM item_embeddings WHERE item_id NOT IN (SELECT id FROM items)"
+        )
+        orphaned_embeddings = cur.rowcount
 
         conn.commit()
         print(f"Rebuilt {db_path} — {total} rows across {len(rows_by_table)} tables.")
+        num_ingredient_rows = len(rows_by_table.get("item_ingredients", []))
+        print(f"Linked {linked} of {num_ingredient_rows} item_ingredients "
+              "rows to a canonical ingredient (base_ingredient_id).")
         if orphaned_tags or orphaned_marks:
             print(
                 f"Cleaned up {orphaned_tags} orphaned ingredient_tags and "
                 f"{orphaned_marks} orphaned classified_items rows (source "
                 "content changed since they were classified)."
+            )
+        if orphaned_embeddings:
+            print(
+                f"Cleaned up {orphaned_embeddings} orphaned item_embeddings rows "
+                "(source content changed since they were embedded — rerun `embed`)."
             )
     finally:
         conn.close()
@@ -588,6 +702,210 @@ def reset_category(wiki_root: Path, category: str) -> None:
         conn.close()
 
 
+DEFAULT_SEMANTIC_MODEL = "intfloat/multilingual-e5-base"
+
+
+def _sha256(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def embed(wiki_root: Path, model_name: str = DEFAULT_SEMANTIC_MODEL) -> None:
+    """Compute/refresh sentence embeddings for every item, using
+    items_fts.body (title + full verbatim section text) as the embedded
+    text. Incremental: only (re)embeds items with no row in item_embeddings
+    for this model, or whose source_hash no longer matches the current
+    body (content changed since last embed). Never touches embeddings for
+    a different model name, so switching models doesn't require a manual
+    wipe — just rerun `embed --model <new-name>` (old rows become dead
+    weight; drop them by hand if you don't intend to keep multiple models).
+    """
+    db_path = wiki_root / DB_FILE_NAME
+    if not db_path.exists():
+        print(f"{db_path} does not exist yet — run `rebuild` first.", file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        from sentence_transformers import SentenceTransformer
+    except ImportError:
+        print(
+            "The 'sentence-transformers' package is required for `embed`.\n"
+            "Install it with: pip install sentence-transformers",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    import numpy as np
+    import datetime
+
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+        rows = cur.execute(
+            """
+            SELECT items.id AS item_id, items.title AS title, items_fts.body AS body,
+                   item_embeddings.source_hash AS existing_hash
+            FROM items
+            JOIN items_fts ON items_fts.item_id = items.id
+            LEFT JOIN item_embeddings
+                ON item_embeddings.item_id = items.id AND item_embeddings.model = ?
+            """,
+            (model_name,),
+        ).fetchall()
+
+        pending = []
+        for row in rows:
+            text = f"{row['title']}\n\n{row['body']}"
+            h = _sha256(text)
+            if row["existing_hash"] != h:
+                pending.append((row["item_id"], text, h))
+
+        if not pending:
+            print(f"Nothing to embed — all {len(rows)} items already up to date for model '{model_name}'.")
+            return
+
+        print(f"Embedding {len(pending)} of {len(rows)} items with '{model_name}' "
+              "(new or changed since last embed)...")
+        model = SentenceTransformer(model_name)
+        # e5 models expect a "passage: " prefix for indexed documents (and a
+        # "query: " prefix at search time) to match their training format.
+        texts = ["passage: " + t for (_, t, _) in pending]
+        vectors = model.encode(texts, batch_size=32, show_progress_bar=True,
+                                convert_to_numpy=True, normalize_embeddings=True)
+        dim = vectors.shape[1]
+        now = datetime.date.today().isoformat()
+
+        cur.executemany(
+            "INSERT OR REPLACE INTO item_embeddings "
+            "(item_id, model, dim, vector, source_hash, computed_at) VALUES (?, ?, ?, ?, ?, ?)",
+            [
+                (item_id, model_name, dim, np.asarray(vec, dtype=np.float32).tobytes(), h, now)
+                for (item_id, _, h), vec in zip(pending, vectors)
+            ],
+        )
+        conn.commit()
+        print(f"Stored {len(pending)} embeddings (dim={dim}) in item_embeddings.")
+    finally:
+        conn.close()
+
+
+# Tags within the allergen category that count as a hard exclusion here —
+# see wiki/preferences.md "Unverträglichkeiten" and CLAUDE.md's PREFERENCES
+# workflow. Project-specific, like the rest of this script's schema.
+_HARD_EXCLUSION_ALLERGEN_TAGS = ("histamine_high", "fructose_high")
+
+
+def _table_exists(cur: sqlite3.Cursor, name: str) -> bool:
+    return cur.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,)
+    ).fetchone() is not None
+
+
+def _hard_excluded_item_ids(cur: sqlite3.Cursor) -> set[int]:
+    """Item ids that violate a hard exclusion from wiki/preferences.md:
+    a curated ingredient_intolerances override, or an ingredient tagged
+    with one of _HARD_EXCLUSION_ALLERGEN_TAGS in the allergen category
+    (see additional-information-retrieval). Degrades to "nothing excluded"
+    if this project hasn't set up those tables/preferences yet, so this
+    stays safe to call unconditionally."""
+    excluded: set[int] = set()
+    if _table_exists(cur, "ingredient_intolerances") and _table_exists(cur, "item_ingredients"):
+        excluded.update(
+            row[0] for row in cur.execute(
+                "SELECT DISTINCT item_id FROM item_ingredients "
+                "WHERE base_ingredient_id IN (SELECT ingredient_id FROM ingredient_intolerances)"
+            ).fetchall()
+        )
+    if _table_exists(cur, "ingredient_tags"):
+        placeholders = ", ".join("?" for _ in _HARD_EXCLUSION_ALLERGEN_TAGS)
+        excluded.update(
+            row[0] for row in cur.execute(
+                "SELECT DISTINCT item_ingredients.item_id FROM item_ingredients "
+                "JOIN ingredient_tags ON ingredient_tags.ingredient_id = item_ingredients.id "
+                f"WHERE ingredient_tags.category = 'allergen' AND ingredient_tags.tag IN ({placeholders})",
+                _HARD_EXCLUSION_ALLERGEN_TAGS,
+            ).fetchall()
+        )
+    return excluded
+
+
+def similar(wiki_root: Path, item_id: int, top_k: int = 10,
+            model_name: str = DEFAULT_SEMANTIC_MODEL, filtered: bool = True) -> None:
+    """Rank every other embedded item by cosine similarity to item_id and
+    print the top_k. Vectors are stored L2-normalized (see embed()), so
+    cosine similarity reduces to a plain dot product.
+
+    By default (filtered=True) this also enforces the project's hard
+    exclusions from wiki/preferences.md (see _hard_excluded_item_ids) —
+    the semantic ranking itself has no notion of user preferences, so
+    without this a similarity match could recommend something the user
+    is intolerant to (this happened once: a top result contained garlic
+    powder, missed because it wasn't yet in ingredient_intolerances).
+    Pass filtered=False (`--raw` on the CLI) to see the unfiltered
+    ranking, e.g. for debugging or auditing what got excluded and why.
+    """
+    db_path = wiki_root / DB_FILE_NAME
+    if not db_path.exists():
+        print(f"{db_path} does not exist yet — run `rebuild` first.", file=sys.stderr)
+        sys.exit(1)
+    import numpy as np
+
+    conn = sqlite3.connect(db_path)
+    try:
+        conn.row_factory = sqlite3.Row
+        cur = conn.cursor()
+        target = cur.execute(
+            "SELECT vector, dim FROM item_embeddings WHERE item_id = ? AND model = ?",
+            (item_id, model_name),
+        ).fetchone()
+        if target is None:
+            print(
+                f"No embedding for item_id {item_id} with model '{model_name}'. "
+                "Run `embed` first.", file=sys.stderr,
+            )
+            sys.exit(1)
+        target_vec = np.frombuffer(target["vector"], dtype=np.float32)
+
+        rows = cur.execute(
+            """
+            SELECT item_embeddings.item_id, item_embeddings.vector,
+                   items.title, items.article, items.anchor
+            FROM item_embeddings
+            JOIN items ON items.id = item_embeddings.item_id
+            WHERE item_embeddings.model = ? AND item_embeddings.item_id != ?
+            """,
+            (model_name, item_id),
+        ).fetchall()
+        if not rows:
+            print("(no other embedded items)")
+            return
+
+        excluded_note = ""
+        if filtered:
+            excluded_ids = _hard_excluded_item_ids(cur)
+            before = len(rows)
+            rows = [r for r in rows if r["item_id"] not in excluded_ids]
+            removed = before - len(rows)
+            if removed:
+                excluded_note = (
+                    f" ({removed} candidate(s) hidden — violate a hard exclusion from "
+                    "wiki/preferences.md; rerun with --raw to see them)"
+                )
+        if not rows:
+            print(f"(no candidates left after preference filtering{excluded_note})")
+            return
+
+        matrix = np.stack([np.frombuffer(r["vector"], dtype=np.float32) for r in rows])
+        scores = matrix @ target_vec
+        order = np.argsort(-scores)[:top_k]
+
+        print(f"score | item_id | title | article | anchor{excluded_note}")
+        for i in order:
+            r = rows[i]
+            print(f"{scores[i]:.4f} | {r['item_id']} | {r['title']} | {r['article']} | {r['anchor']}")
+    finally:
+        conn.close()
+
+
 def query(wiki_root: Path, sql: str) -> None:
     stripped = sql.strip().rstrip(";").strip()
     if not re.match(r"(?is)^select\b", stripped):
@@ -614,7 +932,7 @@ def query(wiki_root: Path, sql: str) -> None:
         conn.close()
 
 
-_COMMANDS = ("rebuild", "query", "classify", "reset-category")
+_COMMANDS = ("rebuild", "query", "classify", "reset-category", "embed", "similar")
 
 
 def main() -> None:
@@ -643,13 +961,40 @@ def main() -> None:
         payload_json = sys.argv[3]
         wiki_root = Path(sys.argv[4]) if len(sys.argv) > 4 else Path("wiki")
         classify(wiki_root, category, payload_json)
-    else:  # reset-category
+    elif command == "reset-category":
         if len(sys.argv) < 3:
             print("reset-category requires <category>", file=sys.stderr)
             sys.exit(1)
         category = sys.argv[2]
         wiki_root = Path(sys.argv[3]) if len(sys.argv) > 3 else Path("wiki")
         reset_category(wiki_root, category)
+    elif command == "embed":
+        rest = sys.argv[2:]
+        model_name = DEFAULT_SEMANTIC_MODEL
+        if "--model" in rest:
+            i = rest.index("--model")
+            model_name = rest[i + 1]
+            rest = rest[:i] + rest[i + 2:]
+        wiki_root = Path(rest[0]) if rest else Path("wiki")
+        embed(wiki_root, model_name)
+    else:  # similar
+        rest = sys.argv[2:]
+        if not rest:
+            print("similar requires <item_id>", file=sys.stderr)
+            sys.exit(1)
+        item_id = int(rest[0])
+        rest = rest[1:]
+        top_k = 10
+        if "--top-k" in rest:
+            i = rest.index("--top-k")
+            top_k = int(rest[i + 1])
+            rest = rest[:i] + rest[i + 2:]
+        filtered = True
+        if "--raw" in rest:
+            rest = [a for a in rest if a != "--raw"]
+            filtered = False
+        wiki_root = Path(rest[0]) if rest else Path("wiki")
+        similar(wiki_root, item_id, top_k, filtered=filtered)
 
 
 if __name__ == "__main__":

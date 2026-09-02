@@ -41,6 +41,19 @@ Schritt ist als eigener Skill unter `.agents/skills/` gekapselt:
    über eine feste, eng begrenzte Textgrundlage nachvollziehbar (Beleg + Konfidenz
    `explicit`/`inferred`) und wird — anders als der mechanische Index — nicht bei jedem Ingest
    automatisch neu berechnet, sondern gezielt klassifiziert bzw. aktualisiert.
+5. **`semantic-processing`** — fügt eine semantische Ähnlichkeitssuche hinzu, die der primären
+   Suche nachgelagert wird: aus den Treffern von Schritt 3/4 ein für den Nutzer relevantes Item
+   auswählen und dazu ähnliche Items finden ("Antworten mit Antworten matchen"), auch ohne
+   gemeinsame Stichwörter. Embeddings werden lokal per `sentence-transformers` (Standardmodell
+   `intfloat/multilingual-e5-base`) berechnet und bewusst **nicht** in einer separaten
+   ChromaDB, sondern als zusätzliche Tabelle `item_embeddings` in derselben
+   `wiki/retrieval-index.db` abgelegt — bei Korpusgrößen im niedrigen vierstelligen Bereich
+   (hier ~3.925 Items) ist Brute-Force-Cosine-Similarity per NumPy schnell genug, sodass ein
+   zweiter Storage-Layer/Vektorindex keinen Mehrwert bringt, aber Komplexität und eine
+   zusätzliche Datei einführen würde — konsistent mit dem "eine Datei, disposable,
+   regenerierbar"-Prinzip von Schritt 3. Wie `additional-information-retrieval` wird die
+   Tabelle nicht bei jedem Rebuild automatisch neu berechnet (teuer), sondern gezielt und
+   inkrementell per `embed`-Kommando aktualisiert.
 
 Ergebnis dieser Pipeline: ein Wiki (`wiki/`), das per SQL vorgefiltert und anschließend inhaltlich
 gelesen werden kann, plus eine auditierbare Zusatzschicht für Kategorien, die Urteilsvermögen statt
@@ -60,7 +73,11 @@ Vorfilterung/Volltextsuche/Artikellektüre gewählt wird) steht in `CLAUDE.md` u
    in `wiki/index.md`/den Artikeln selbst suchen.
 4. Passende Treffer inhaltlich lesen und bewerten — der Index liefert nur Kandidaten, nie die
    endgültige Antwort.
-5. Antworten und mit dem Nutzer diskutieren.
+5. Antworten und mit dem Nutzer diskutieren. Auf Wunsch ähnliche Antworten über semantische Suche
+   finden.
+
+## 4. Skill Evolution
+...
 
 ### Präferenzen und Feedback erfassen
 

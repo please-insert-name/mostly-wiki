@@ -21,9 +21,10 @@ Greife bzgl. Rezepten ausschließlich auf die Informationen der Datenbasis zu. G
 - Wenn sinnvoll: Suche mit ./wiki/index.md
 - Retrieval und Analyse passender Rezepte. 
 - Antwort und weitere Diskussion
+- Auf Wunsch (z. B. "ähnliche Rezepte", "was ist vergleichbar zu X"): semantische Ähnlichkeitssuche über `similar <item_id>` (s. semantic-processing) auf ein bereits als relevant identifiziertes Rezept aus der primären Suche anwenden. Ist kein Ersatz für Schritt "Vorfiltern"/"Suche", sondern nachgelagert. `similar` filtert harte Unverträglichkeiten aus preferences.md standardmäßig automatisch heraus (nicht `--raw` verwenden, außer bewusst zu Debug-Zwecken) — Ergebnisse bleiben aber Kandidaten, keine fertige Antwort: vor Präsentation die Artikel lesen und prüfen, ob die Ähnlichkeit inhaltlich Sinn ergibt.
 - preferences.md aktualisieren: empfohlene Rezepte unter "Ausgegebene Rezepte" ergänzen; neu genannte Unverträglichkeiten/Vorlieben in den passenden Abschnitt eintragen
 
-Verwende dazu die zur Verfügung stehenden Skills unter ./agents/skills
+Verwende dazu die zur Verfügung stehenden Skills unter ./.agents/skills (karpathy-llm-wiki, retrieval-index, additional-information-retrieval, markitdown-processor, semantic-processing). Diese sind nicht über den regulären Skill-Aufruf-Mechanismus verfügbar, da sie nicht in der globalen Skill-Liste registriert sind — ihre SKILL.md-Dateien müssen direkt gelesen und befolgt werden.
 
 # PREFERENCES
 Speichere das Feedback des Benutzers in der Datei preferences.md.
