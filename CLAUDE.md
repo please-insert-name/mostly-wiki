@@ -16,6 +16,8 @@ Greife bzgl. Rezepten ausschließlich auf die Informationen der Datenbasis zu. G
 - Prüfe preferences.md
 - Wenn sinnvoll: Vorfiltern über ./wiki/retrieval-index.db
   - Harte Unverträglichkeiten aus preferences.md werden dabei automatisch als Ausschlusskriterium angewendet (über die allergen-Klassifikation, s. additional-information-retrieval), auch ohne dass der Nutzer sie erneut nennt.
+  - Für die Zutaten-Zuordnung: `item_ingredients.base_ingredient_id` verweist auf die kanonische Zutat in `ingredients` (id, name). ~96 % der Zutatenzeilen sind zugeordnet; nicht zugeordnete Zeilen (`base_ingredient_id IS NULL`) sind meist Kombi-Zeilen oder Rezeptverweise — dort ggf. per Volltext (`line_text LIKE`) zusätzlich prüfen.
+  - Kuratierte Unverträglichkeits-Overrides aus preferences.md liegen in `ingredient_intolerances` (ingredient_id, intoleranz, quelle) — das ist die maßgebliche Quelle für harte Ausschlüsse, da preferences.md Vorrang vor der automatischen `ingredient_tags`-Klassifikation hat (s. PREFERENCES). Bei einer Zutat immer zuerst hier prüfen, dann ergänzend `ingredient_tags`.
 - Wenn sinnvoll: Suche mit ./wiki/index.md
 - Retrieval und Analyse passender Rezepte. 
 - Antwort und weitere Diskussion
@@ -66,6 +68,24 @@ Beispielaufgaben zum Thema "vegan cooking"
 Verwende den additional-information-retrieval Skill, um fehlende Informationen zu ergänzen.
 Für das "vegan cooking" sind dies:
 - Unterträglichkeiten/Allergene auf Basis der Zutatenliste
+- Gesundheitlicher Kontext auf Basis der Zutatenliste (s. unten)
+
+### Gesundheitlicher Kontext (Tabelle health_relevance)
+Für Anfragen mit Bezug zu einem gesundheitlichen Kontext aus preferences.md (Abschnitt "Gesundheitlicher Kontext", z. B. Endometriose) wird die Tabelle **health_relevance** in ./wiki/retrieval-index.db genutzt.
+
+**Schema:**
+- `ingredient` — Zutat (generischer Name, z. B. "Tomate")
+- `health_context` — gesundheitlicher Kontext, auf den sich die Bewertung bezieht (z. B. "Endometriose")
+- `relevanz` — Skala 0–5: 0 sehr ungünstig, 1 ungünstig, 2/3 eher neutral, 4 günstig, 5 sehr günstig
+- `begruendung` — kurze Zusammenfassung des Zusammenhangs
+- `quelle` — Fundstelle/URL der Recherche
+- `abgerufen_am` — Datum der Recherche
+
+**Workflow:**
+- Vor der Nutzung prüfen, ob für die relevante `ingredient`/`health_context`-Kombination bereits ein Eintrag existiert.
+- Fehlt ein Eintrag: über additional-information-retrieval im Netz recherchieren, Ergebnis mit Quelle und Abrufdatum in `health_relevance` eintragen.
+- Für Empfehlungen, die auf den gesundheitlichen Kontext einzahlen sollen: bevorzugt Rezepte mit Zutaten `relevanz >= 4` vorschlagen; Zutaten mit `relevanz <= 1` möglichst meiden (kein hartes Ausschlusskriterium, s. preferences.md).
+- Die Tabelle ist bewusst generisch (nicht auf einen einzelnen gesundheitlichen Kontext beschränkt) und kann für weitere Kontexte wiederverwendet werden, die künftig in preferences.md unter "Gesundheitlicher Kontext" auftauchen.
 
 ## BEISPIELFRAGEN
 - Ich suche ein Rezept für ein Mittagessen. Was kann ich mit Reis, Paprika, Zucchini und Karotten machen?
