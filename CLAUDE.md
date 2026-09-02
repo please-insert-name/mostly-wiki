@@ -56,6 +56,19 @@ Beispiel bei Match:
 "Am 26.08.2026 habe ich dir ein Rezept für XO Fried Rice empfohlen. Hat das geschmeckt? Wäre das passend? Oder soll ich etwas ähnliches suchen?"
 Feedback zu Rezepten kann ebenfalls in der preference.md abgespeichert werden.
 
+# SKILL EVOLUTION
+Erkenntnisse aus dem täglichen Umgang mit dem System werden in `LEARNED_LESSONS.md` (Projekt-Root) gesammelt, bevor sie zu einer Skill-Änderung führen — dieselbe Zwei-Stufen-Disziplin wie bei Schema-Änderungen in `retrieval-index`/`additional-information-retrieval` (erst Beobachtung/Evidenz sammeln, dann bewusste Freigabe, dann Umsetzung). Eine Erkenntnis führt nie automatisch/still zu einer Skill-Änderung.
+
+## Wann protokollieren
+- Wenn sich ein Skill, ein Filter oder eine Annahme über das Wiki-Schema als lückenhaft, falsch oder überraschend herausstellt (z. B. ein Filter, der etwas durchlässt, das er nicht sollte; ein stiller Datenverlust; ein Workflow-Schritt, der in der Praxis regelmäßig übersprungen/vergessen wird)
+- Nicht bei jeder Anfrage — nur bei Erkenntnissen, die über den aktuellen Einzelfall hinaus relevant sind
+- Eintrag unter "## Neue Erkenntnisse" in `LEARNED_LESSONS.md` anlegen; Schema (Datum | Skill/Datei | Beobachtung | Vorschlag) steht dort als Kommentar
+
+## Wann sichten/verarbeiten
+- Auf Zuruf des Nutzers (z. B. "prüfe LEARNED_LESSONS.md", "skill evolution")
+- Proaktiv, bevor ein Skill substantiell geändert wird: zuerst offene Einträge zu diesem Skill in `LEARNED_LESSONS.md` durchsehen
+- Verarbeiten heißt: pro Eintrag entscheiden, ob eine Änderung an SKILL.md/CLAUDE.md/Code gerechtfertigt ist (bei Schema-relevanten Änderungen weiterhin Rückfrage/Freigabe einholen, s. `retrieval-index/SKILL.md`), diese umsetzen, und den Eintrag mit kurzem Verweis auf die vorgenommene Änderung nach "## Bereits verarbeitete Erkenntnisse" verschieben. "Kein Änderungsbedarf" ist ebenfalls eine gültige, protokollierte Verarbeitung — nicht stillschweigend ignorieren.
+
 # AUFGABEN
 Beispielaufgaben zum Thema "vegan cooking"
 ## ALLGEMEIN

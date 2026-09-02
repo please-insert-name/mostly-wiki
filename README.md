@@ -77,7 +77,26 @@ Vorfilterung/Volltextsuche/Artikellektüre gewählt wird) steht in `CLAUDE.md` u
    finden.
 
 ## 4. Skill Evolution
-...
+
+Skills ändern sich hier nie "leise" — jede Schema- oder Verhaltensänderung durchläuft dieselbe
+Zwei-Stufen-Disziplin, die `retrieval-index`/`additional-information-retrieval` schon für
+Schema-Erweiterungen vorschreiben (Beispielfragen sammeln → Schema vorschlagen → Freigabe
+einholen → erst dann implementieren). `LEARNED_LESSONS.md` (Projekt-Root) ist die dafür nötige
+Zwischenablage: Beobachtungen aus dem täglichen Gebrauch werden dort unter "Neue Erkenntnisse"
+gesammelt (Schema: Datum | betroffener Skill | Beobachtung | ggf. Vorschlag), bevor sie zu einer
+tatsächlichen Skill-Änderung führen. So kann sich über mehrere Sitzungen Evidenz ansammeln, statt
+auf einen einzelnen Vorfall überzureagieren.
+
+Verarbeitung ist ein bewusster, protokollierter Schritt (auf Zuruf, oder proaktiv bevor ein Skill
+substantiell geändert wird) — nie ein automatischer Trigger: pro Eintrag wird entschieden, ob eine
+Änderung gerechtfertigt ist, diese wird umgesetzt (inkl. erneuter Freigabe bei Schema-relevanten
+Fällen), und der Eintrag wandert mit Verweis auf die Änderung nach "Bereits verarbeitete
+Erkenntnisse". Auch "kein Änderungsbedarf" zählt als gültige Verarbeitung. Zwei reale Beispiele
+stehen bereits in `LEARNED_LESSONS.md`: ein Datenverlust durch ein unversioniertes Schema-Feld
+(behoben durch Aufnahme ins versionierte `SCHEMA_SQL`) und eine Präferenzen-Filterlücke in der
+semantischen Suche (behoben durch fest im Code verankerte statt nur dokumentierte Filterung — s.
+Skill `semantic-processing`). Details zum Workflow stehen in `CLAUDE.md` unter `## SKILL
+EVOLUTION`.
 
 ### Präferenzen und Feedback erfassen
 
