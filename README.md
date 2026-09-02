@@ -15,6 +15,10 @@ definiert; dieses README beschreibt die generische Architektur dahinter.
 
 ## 2. Workflow: Neues Wiki generieren
 
+Quellen:
+Microsoft: MarkItDown (https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)
+Karpathy-Wiki (https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)
+
 Die Pipeline führt von unstrukturierten Quelldateien zu einer abfragbaren Wissensbasis. Jeder
 Schritt ist als eigener Skill unter `.agents/skills/` gekapselt:
 
@@ -78,8 +82,9 @@ Vorfilterung/Volltextsuche/Artikellektüre gewählt wird) steht in `CLAUDE.md` u
 
 ## 4. Skill Evolution
 
-Orientiert sich an WikiSkill: `Compiling Agent Experience into Persistent Knowledge for Skill 
-Evolution` (https://arxiv.org/pdf/2608.27454v1)
+Quellen: 
+`Compiling Agent Experience into Persistent Knowledge for Skill Evolution` 
+(https://arxiv.org/pdf/2608.27454v1)
 
 Skills ändern sich hier nie "leise" — jede Schema- oder Verhaltensänderung durchläuft dieselbe
 Zwei-Stufen-Disziplin, die `retrieval-index`/`additional-information-retrieval` schon für
