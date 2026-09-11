@@ -28,12 +28,12 @@ Schritt ist als eigener Skill unter `.agents/skills/` gekapselt:
    XLSX). Ein Bridge-Skript (`to_wiki_raw.py`) übergibt das Ergebnis anschließend im vom
    nächsten Skill erwarteten Format nach `raw/<topic>/`.
 2. **`karpathy-llm-wiki`** — kompiliert die Rohdateien aus `raw/` zu themenstrukturierten
-   Wiki-Artikeln unter `wiki/<topic>/*.md`, inklusive laufend gepflegtem Index
-   (`wiki/index.md`) und Änderungsprotokoll (`wiki/log.md`). Neue Quellen werden mit
+   Wiki-Artikeln unter `wiki/<namespace>/library/*.md`, inklusive laufend gepflegtem Index
+   (`wiki/<namespace>/index.md`) und Änderungsprotokoll (`wiki/<namespace>/log.md`). Neue Quellen werden mit
    bestehenden Artikeln zusammengeführt oder legen neue Artikel an; Widersprüche zwischen
    Quellen werden mit Quellenangabe im Artikel vermerkt statt stillschweigend aufgelöst.
 3. **`retrieval-index`** — baut aus den Wiki-Artikeln eine SQLite-Datenbank
-   (`wiki/retrieval-index.db`) für schnelles, strukturiertes Vorfiltern per SQL (z. B. nach
+   (`wiki/<namespace>/retrieval-index.db`) für schnelles, strukturiertes Vorfiltern per SQL (z. B. nach
    Zutaten, Zeitangaben, Kategorien), bevor ganze Artikel gelesen werden. Das Schema ist
    projektspezifisch und wird aus konkreten Beispielfragen abgeleitet; die Datenbank enthält
    ausschließlich mechanisch aus dem Text extrahierbare Fakten, keine Bewertungen. Sie wird bei
@@ -51,7 +51,7 @@ Schritt ist als eigener Skill unter `.agents/skills/` gekapselt:
    gemeinsame Stichwörter. Embeddings werden lokal per `sentence-transformers` (Standardmodell
    `intfloat/multilingual-e5-base`) berechnet und bewusst **nicht** in einer separaten
    ChromaDB, sondern als zusätzliche Tabelle `item_embeddings` in derselben
-   `wiki/retrieval-index.db` abgelegt — bei Korpusgrößen im niedrigen vierstelligen Bereich
+   `wiki/<namespace>/retrieval-index.db` abgelegt — bei Korpusgrößen im niedrigen vierstelligen Bereich
    (hier ~3.925 Items) ist Brute-Force-Cosine-Similarity per NumPy schnell genug, sodass ein
    zweiter Storage-Layer/Vektorindex keinen Mehrwert bringt, aber Komplexität und eine
    zusätzliche Datei einführen würde — konsistent mit dem "eine Datei, disposable,
@@ -74,7 +74,7 @@ Vorfilterung/Volltextsuche/Artikellektüre gewählt wird) steht in `CLAUDE.md` u
 2. Bekannte Präferenzen/Einschränkungen des Nutzers prüfen (siehe unten).
 3. Über `retrieval-index.db` vorfiltern (inkl. harter Ausschlüsse aus den Präferenzen, sofern
    eine passende `additional-information-retrieval`-Kategorie existiert) und/oder per Volltext
-   in `wiki/index.md`/den Artikeln selbst suchen.
+   in `wiki/<namespace>/index.md`/den Artikeln selbst suchen.
 4. Passende Treffer inhaltlich lesen und bewerten — der Index liefert nur Kandidaten, nie die
    endgültige Antwort.
 5. Antworten und mit dem Nutzer diskutieren. Auf Wunsch ähnliche Antworten über semantische Suche
@@ -116,7 +116,7 @@ EVOLUTION`.
 
 Damit der Assistent über mehrere Sitzungen hinweg dazulernt, wird eine `preferences.md`
 (Speicherort projektspezifisch in `CLAUDE.md` festgelegt, im Beispielprojekt
-`./wiki/preferences.md`) laufend gepflegt:
+`./wiki/<namespace>/preferences.md`) laufend gepflegt:
 
 - **Ausgegebene Empfehlungen** — was wurde wann empfohlen, inkl. Kontext und (falls vorhanden)
   Nutzer-Feedback dazu.

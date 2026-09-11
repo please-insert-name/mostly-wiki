@@ -17,9 +17,9 @@ Three layers, all under the user's project root:
 
 **raw/** — Immutable source material. You read, never modify. Organized by topic subdirectories (e.g., `raw/machine-learning/`).
 
-**wiki/** — Compiled knowledge articles. You have full ownership. Organized by topic subdirectories, one level only: `wiki/<topic>/<article>.md`. Contains two special files:
-- `wiki/index.md` — Global index. One row per article, grouped by topic, with link + summary + Updated date.
-- `wiki/log.md` — Append-only operation log.
+**wiki/** — Compiled knowledge articles. You have full ownership. Each wiki lives in its own namespace: `wiki/<namespace>/`. Articles: `wiki/<namespace>/library/<article>.md`. Contains two special files per namespace:
+- `wiki/<namespace>/index.md` — Index for this namespace. One row per article, grouped by topic, with link + summary + Updated date.
+- `wiki/<namespace>/log.md` — Append-only operation log for this namespace.
 
 **SKILL.md** (this file) — Schema layer. Defines structure and workflow rules.
 
@@ -31,8 +31,8 @@ Triggers only on the first Ingest. Check whether `raw/` and `wiki/` exist. Creat
 
 - `raw/` directory (with `.gitkeep`)
 - `wiki/` directory (with `.gitkeep`)
-- `wiki/index.md` — heading `# Knowledge Base Index`, empty body
-- `wiki/log.md` — heading `# Wiki Log`, empty body
+- `wiki/<namespace>/index.md` — heading `# Knowledge Base Index`, empty body
+- `wiki/<namespace>/log.md` — heading `# Wiki Log`, empty body
 
 If Query or Lint cannot find the wiki structure, tell the user: "Run an ingest first to initialize the wiki." Do not auto-create.
 
@@ -77,16 +77,16 @@ See `references/article-template.md` for article format. Key points:
 After the primary article, check for ripple effects:
 
 1. Scan articles in the same topic directory for content affected by the new source.
-2. Scan `wiki/index.md` entries in other topics for articles covering related concepts.
+2. Scan `wiki/<namespace>/index.md` entries in other topics for articles covering related concepts.
 3. Update every article whose content is materially affected. Each updated file gets its Updated date refreshed.
 
 Archive pages are never cascade-updated (they are point-in-time snapshots).
 
 ### Post-Ingest
 
-Update `wiki/index.md`: add or update entries for every touched article. When adding a new topic section, include a one-line description. The Updated date reflects when the article's knowledge content last changed, not the file system timestamp. See `references/index-template.md` for format.
+Update `wiki/<namespace>/index.md`: add or update entries for every touched article. When adding a new topic section, include a one-line description. The Updated date reflects when the article's knowledge content last changed, not the file system timestamp. See `references/index-template.md` for format.
 
-Append to `wiki/log.md`:
+Append to `wiki/<namespace>/log.md`:
 
 ```
 ## [YYYY-MM-DD] ingest | <primary article title>
@@ -107,7 +107,7 @@ Search the wiki and answer questions. Examples of triggers:
 
 ### Steps
 
-1. Read `wiki/index.md` to locate relevant articles.
+1. Read `wiki/<namespace>/index.md` to locate relevant articles.
 2. Read those articles and synthesize an answer.
 3. Prefer wiki content over your own training knowledge. Cite sources with markdown links: `[Article Title](wiki/topic/article.md)` (project-root-relative paths for in-conversation citations; within wiki/ files, use paths relative to the current file).
 4. Output the answer in the conversation. Do not write files unless asked.
@@ -122,8 +122,8 @@ When the user explicitly asks to archive or save the answer to the wiki:
    - File name reflects the query topic, e.g., `transformer-architectures-overview.md`.
    - Place in the most relevant topic directory.
 2. Always create a new page. Never merge into existing articles (archive content is a synthesized answer, not raw material).
-3. Update `wiki/index.md`. Prefix the Summary with `[Archived]`.
-4. Append to `wiki/log.md`:
+3. Update `wiki/<namespace>/index.md`. Prefix the Summary with `[Archived]`.
+4. Append to `wiki/<namespace>/log.md`:
    ```
    ## [YYYY-MM-DD] query | Archived: <page title>
    ```
@@ -138,7 +138,7 @@ Quality checks on the wiki. Two categories with different authority levels.
 
 Fix these automatically:
 
-**Index consistency** — compare `wiki/index.md` against actual wiki/ files (excluding index.md and log.md):
+**Index consistency** — compare `wiki/<namespace>/index.md` against actual wiki/<namespace>/ files (excluding index.md and log.md):
 - File exists but missing from index → add entry with `(no summary)` placeholder. For Updated, use the article's metadata Updated date if present; otherwise fall back to file's last modified date.
 - Index entry points to nonexistent file → mark as `[MISSING]` in the index. Do not delete the entry; let the user decide.
 
@@ -170,7 +170,7 @@ These rely on your judgment. Report findings without auto-fixing:
 
 ### Post-Lint
 
-Append to `wiki/log.md`:
+Append to `wiki/<namespace>/log.md`:
 
 ```
 ## [YYYY-MM-DD] lint | <N> issues found, <M> auto-fixed
@@ -184,4 +184,4 @@ Append to `wiki/log.md`:
 - wiki/ supports one level of topic subdirectories only. No deeper nesting.
 - Today's date for log entries, Collected dates, and Archived dates. Updated dates reflect when the article's knowledge content last changed. Published dates come from the source (use `Unknown` when unavailable).
 - Inside wiki/ files, all markdown links use paths relative to the current file. In conversation output, use project-root-relative paths (e.g., `wiki/topic/article.md`).
-- Ingest updates both `wiki/index.md` and `wiki/log.md`. Archive (from Query) updates both. Lint updates `wiki/log.md` (and `wiki/index.md` only when auto-fixing index entries). Plain queries do not write any files.
+- Ingest updates both `wiki/<namespace>/index.md` and `wiki/<namespace>/log.md`. Archive (from Query) updates both. Lint updates `wiki/<namespace>/log.md` (and `wiki/<namespace>/index.md` only when auto-fixing index entries). Plain queries do not write any files.

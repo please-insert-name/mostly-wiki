@@ -432,12 +432,13 @@ def _extract_ingredients(block: str):
 
 
 def extract_records(wiki_root: Path):
-    """Walk wiki/vegan-cooking/*.md, split each file into '## ' recipe
+    """Walk wiki_root/library/*.md, split each file into '## ' recipe
     sections (skipping 'Overview'), and yield items/item_ingredients/
     items_fts rows for each."""
-    for path in sorted((wiki_root / "vegan-cooking").glob("*.md")):
+    wiki_name = wiki_root.name  # e.g. "vegan-cooking" or "keto-cooking"
+    for path in sorted((wiki_root / "library").glob("*.md")):
         text = path.read_text(encoding="utf-8")
-        article = f"vegan-cooking/{path.name}"
+        article = f"{wiki_name}/library/{path.name}"
 
         h1_m = re.match(r"^#\s+(.+)$", text, re.M)
         h1 = h1_m.group(1).strip() if h1_m else path.stem

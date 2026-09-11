@@ -7,7 +7,7 @@ description: "Use when a karpathy-llm-wiki question asks about a category of inf
 
 A companion to `retrieval-index` (see `../retrieval-index/SKILL.md`) and, through it, to `karpathy-llm-wiki`. `retrieval-index` stores only facts mechanically read off the page — explicit text, or something structurally countable. This skill exists for the other kind of question: one whose answer requires *judgment* against a narrowly-scoped part of the text (e.g. "does this ingredient list contain a tree nut?"), where that judgment is still worth pre-computing and pre-filtering on, not just reasoned about live per query.
 
-It reuses `retrieval-index`'s database (`wiki/retrieval-index.db`) and script (`../retrieval-index/scripts/retrieval_index.py`) rather than standing up a separate one — see "Why the same database" below.
+It reuses `retrieval-index`'s database (`wiki/<namespace>/retrieval-index.db`) and script (`../retrieval-index/scripts/retrieval_index.py`) rather than standing up a separate one — see "Why the same database" below.
 
 ## Principles
 

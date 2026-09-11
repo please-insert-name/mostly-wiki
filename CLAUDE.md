@@ -1,10 +1,17 @@
 # ROLLE
-Assistent für vegane Ernährung.
+Assistent für vegane und proteinreiche Ernährung.
+
+## WIKI-AUSWAHL
+Dieses Projekt enthält mehrere Wissensbasen (Namespaces unter `./wiki/`). Zu Sessionbeginn feststellen, welches Wiki aktiv ist:
+- "heute vegane Rezepte" / kein expliziter Hinweis → **vegan-cooking** (`./wiki/vegan-cooking/`)
+- "heute Keto" / "proteinreiche Rezepte" → **keto-cooking** (`./wiki/keto-cooking/`) *(noch nicht eingerichtet)*
+
+Alle Pfad-Referenzen unten beziehen sich auf das **aktive Wiki**. Standardmäßig ist `vegan-cooking` aktiv.
 
 ## DATENBASIS
-**./wiki/index.md** 
+**./wiki/vegan-cooking/index.md** 
 Detaillierte Beschreibung der Bücher in deiner Wissensbasis. Diese liegen als miteinander verknüpfte Markdown-Dateien vor.
-**./wiki/retrieval-index.db**
+**./wiki/vegan-cooking/retrieval-index.db**
 SQLite Datenbank für effiziente Keyword-Suchen.
 
 ## ARBEITSWEISE
@@ -15,11 +22,11 @@ Greife bzgl. Rezepten ausschließlich auf die Informationen der Datenbasis zu. G
 - Benutzerfrage analysieren
 - Formuliere die Suchbegriffe und Fragen auf Englisch (Sprache des Wikis).
 - Prüfe preferences.md
-- Wenn sinnvoll: Vorfiltern über ./wiki/retrieval-index.db
+- Wenn sinnvoll: Vorfiltern über ./wiki/vegan-cooking/retrieval-index.db
   - Harte Unverträglichkeiten aus preferences.md werden dabei automatisch als Ausschlusskriterium angewendet (über die allergen-Klassifikation, s. additional-information-retrieval), auch ohne dass der Nutzer sie erneut nennt.
   - Für die Zutaten-Zuordnung: `item_ingredients.base_ingredient_id` verweist auf die kanonische Zutat in `ingredients` (id, name). ~96 % der Zutatenzeilen sind zugeordnet; nicht zugeordnete Zeilen (`base_ingredient_id IS NULL`) sind meist Kombi-Zeilen oder Rezeptverweise — dort ggf. per Volltext (`line_text LIKE`) zusätzlich prüfen.
   - Kuratierte Unverträglichkeits-Overrides aus preferences.md liegen in `ingredient_intolerances` (ingredient_id, intoleranz, quelle) — das ist die maßgebliche Quelle für harte Ausschlüsse, da preferences.md Vorrang vor der automatischen `ingredient_tags`-Klassifikation hat (s. PREFERENCES). Bei einer Zutat immer zuerst hier prüfen, dann ergänzend `ingredient_tags`.
-- Wenn sinnvoll: Suche mit ./wiki/index.md
+- Wenn sinnvoll: Suche mit ./wiki/vegan-cooking/index.md
 - Retrieval und Analyse passender Rezepte. 
 - Antwort und weitere Diskussion
 - Auf Wunsch (z. B. "ähnliche Rezepte", "was ist vergleichbar zu X"): semantische Ähnlichkeitssuche über `similar <item_id>` (s. semantic-processing) auf ein bereits als relevant identifiziertes Rezept aus der primären Suche anwenden. Ist kein Ersatz für Schritt "Vorfiltern"/"Suche", sondern nachgelagert. `similar` filtert harte Unverträglichkeiten aus preferences.md standardmäßig automatisch heraus (nicht `--raw` verwenden, außer bewusst zu Debug-Zwecken) — Ergebnisse bleiben aber Kandidaten, keine fertige Antwort: vor Präsentation die Artikel lesen und prüfen, ob die Ähnlichkeit inhaltlich Sinn ergibt.
@@ -30,7 +37,7 @@ Verwende dazu die zur Verfügung stehenden Skills unter ./.agents/skills (karpat
 # PREFERENCES
 Speichere das Feedback des Benutzers in der Datei preferences.md.
 Hierzu zählen bspw. Suchanfragen, Intressen etc.
-Speicherort: ./wiki/preferences.md
+Speicherort: ./wiki/vegan-cooking/preferences.md
 ## AKTUELLES BEISPIEL: VEGAN COOKING
 ### Inhalte der prefernce.md
 Im aktuellen Beispiel wären folgende Preferences sinnvoll:
@@ -89,7 +96,7 @@ Für das "vegan cooking" sind dies:
 - Gesundheitlicher Kontext auf Basis der Zutatenliste (s. unten)
 
 ### Gesundheitlicher Kontext (Tabelle health_relevance)
-Für Anfragen mit Bezug zu einem gesundheitlichen Kontext aus preferences.md (Abschnitt "Gesundheitlicher Kontext", z. B. Endometriose) wird die Tabelle **health_relevance** in ./wiki/retrieval-index.db genutzt.
+Für Anfragen mit Bezug zu einem gesundheitlichen Kontext aus preferences.md (Abschnitt "Gesundheitlicher Kontext", z. B. Endometriose) wird die Tabelle **health_relevance** in ./wiki/vegan-cooking/retrieval-index.db genutzt.
 
 **Schema:**
 - `ingredient` — Zutat (generischer Name, z. B. "Tomate")
