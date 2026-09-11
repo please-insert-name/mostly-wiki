@@ -123,7 +123,8 @@ CREATE TABLE items (
     dietary_tags TEXT,
     notes_text TEXT,          -- concatenated *Note:*/*Tip:*/*Notes:*/*Cooking Tip:* lines, verbatim
     num_ingredients INTEGER,
-    num_steps INTEGER
+    num_steps INTEGER,
+    image_path TEXT           -- relative to wiki/, e.g. "vegan-cooking/images/book/images/16-1.jpg"
 );
 
 CREATE TABLE item_ingredients (
@@ -431,6 +432,41 @@ def _extract_ingredients(block: str):
             sub_component = bold.group(1).strip()
 
 
+def _load_raw_images(raw_md_path: Path) -> dict[str, str]:
+    """Parse a raw EPUB-converted markdown file; return {normalized_title: image_ref}.
+
+    EPUB/PDF/DOCX conversion (via markitdown-processor) embeds images as
+    ![](subdir/images/page-N.jpg) within the first ~20 lines after each section
+    heading.  Both # and ## heading levels are scanned because different source
+    documents use different levels for their main sections.  Markdown bold/italic
+    formatting (*, **, ***) is stripped and keys are lowercased so that wiki DB
+    section titles (title-case, plain text) can match via .lower() comparison,
+    even when the source used ALL-CAPS or markdown emphasis in headings.
+
+    Domain-agnostic: works for any document type, not just cookbooks.
+    See retrieval-index/SKILL.md §"Optional: image_path" for the full convention.
+    """
+    if not raw_md_path.exists():
+        return {}
+    lines = raw_md_path.read_text(encoding="utf-8").splitlines()
+    title_positions: list[tuple[int, str]] = []
+    for i, line in enumerate(lines):
+        m = re.match(r"^#{1,2}\s+(.+)$", line)
+        if m:
+            raw_title = re.sub(r"\*+", "", m.group(1)).strip()
+            raw_title = " ".join(raw_title.split())
+            title_positions.append((i, raw_title.lower()))
+    image_map: dict[str, str] = {}
+    for idx, (pos, title_key) in enumerate(title_positions):
+        end = title_positions[idx + 1][0] if idx + 1 < len(title_positions) else len(lines)
+        for line in lines[pos : min(pos + 20, end)]:
+            m = re.match(r"!\[\]\((.+?)\)\s*$", line.strip())
+            if m:
+                image_map[title_key] = m.group(1)
+                break
+    return image_map
+
+
 def extract_records(wiki_root: Path):
     """Walk wiki_root/library/*.md, split each file into '## ' recipe
     sections (skipping 'Overview'), and yield items/item_ingredients/
@@ -447,6 +483,17 @@ def extract_records(wiki_root: Path):
         preamble = text[: first_h2.start()] if first_h2 else text
         book, author = _parse_front_matter(preamble, h1)
         chapter = re.sub(r"\s*\([^()]*\)\s*$", "", h1).strip()
+
+        raw_slug_m = re.search(
+            r"^> (?:Raw|Source):\s*\[.+?\]\([^)]*?/([^/)]+\.md)\)",
+            preamble,
+            re.M,
+        )
+        raw_images: dict[str, str] = (
+            _load_raw_images(wiki_root / "images" / raw_slug_m.group(1))
+            if raw_slug_m
+            else {}
+        )
 
         sections = re.split(r"^## (.+)$", text, flags=re.M)
         for i in range(1, len(sections), 2):
@@ -505,6 +552,9 @@ def extract_records(wiki_root: Path):
             anchor = _anchor(title)
             item_id = _stable_id(article, anchor)
 
+            image_ref = raw_images.get(title.lower())
+            image_path = f"{wiki_name}/images/{image_ref}" if image_ref else None
+
             yield (
                 "items",
                 {
@@ -528,6 +578,7 @@ def extract_records(wiki_root: Path):
                     "notes_text": notes_text,
                     "num_ingredients": num_ingredients,
                     "num_steps": num_steps,
+                    "image_path": image_path,
                 },
             )
             for position, (sub_component, line_text) in enumerate(ingredients):

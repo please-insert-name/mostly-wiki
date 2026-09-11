@@ -31,6 +31,33 @@ CREATE VIRTUAL TABLE items_fts USING fts5(
 
 Combine both at query time: structured columns/tables narrow on hard filters (AND/OR/NOT), `items_fts MATCH '...'` (optionally ranked with `bm25(items_fts)`) narrows on free-text relevance, joined on `item_id`.
 
+### Optional: image_path — linking items to source images
+
+When the source documents were converted from EPUB, PDF, or DOCX via `markitdown-processor`, extracted images land next to the converted markdown. Add `image_path TEXT` to `items` to make those images retrievable by item.
+
+**Convention (follow this for any wiki namespace):**
+
+1. Place the raw markdown files (produced by `markitdown-processor`) together with their image subdirectories under `wiki/<namespace>/images/`. The directory ends up looking like:
+   ```
+   wiki/<namespace>/images/
+     2024-01-15-my-book.md        ← EPUB-converted markdown, embeds ![](my-book/images/16-1.jpg)
+     my-book/
+       images/
+         16-1.jpg
+         16-2.jpg
+   ```
+2. Each wiki library article that was compiled from such a source must carry a `> Raw:` or `> Source:` preamble link pointing to the corresponding raw markdown file. This link is written by `karpathy-llm-wiki` during ingest and is what ties the wiki article to its raw source — no additional configuration needed.
+3. Add `image_path TEXT` to the `items` schema (relative to `wiki/`, e.g. `"vegan-cooking/images/my-book/images/16-1.jpg"`).
+4. In `extract_records()`, after the preamble is parsed, call `_load_raw_images()` (already implemented in `retrieval_index.py`) passing the resolved raw markdown path. Look up each item's section title via `raw_images.get(title.lower())`.
+
+**How `_load_raw_images()` works (generic, no domain logic):**
+- Scans all `#` and `##` level headings in the raw markdown.
+- Strips markdown bold/italic formatting (`*`, `**`, `***`) from heading text and lowercases keys, so that wiki DB titles (title-case, plain text) can match via `.lower()` even when the source used ALL-CAPS or markdown emphasis.
+- Within the ~20 lines after each heading, returns the first `![](<path>)` image reference found.
+- Works for any document type, not just cookbooks — the heading→image co-location pattern is a universal artifact of EPUB conversion.
+
+**When images are missing for some items:** check (a) whether a `Raw:`/`Source:` preamble link exists in the wiki article, (b) whether the raw markdown file is present under `wiki/<namespace>/images/`, and (c) whether the item's section title (lowercased) matches any heading in that raw file (lowercased, markdown stripped). Items from books without a raw markdown file will have `image_path IS NULL`.
+
 ## Setup workflow (once per project, or when the schema no longer covers a new question)
 
 Run this before the database exists, or whenever a new example question can't be answered by the current schema.
