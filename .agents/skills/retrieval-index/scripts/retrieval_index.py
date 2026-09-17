@@ -120,6 +120,14 @@ CREATE TABLE items (
     cook_minutes INTEGER,
     total_minutes INTEGER,    -- explicit "Total Time" if stated, else prep+cook when both known
     calories_text TEXT,
+    calories_kcal REAL,       -- parsed numeric kcal per serving
+    net_carbs_g REAL,         -- net carbs per serving (Total Carbs − Fiber − Sugar Alcohols)
+    protein_g REAL,           -- protein per serving in grams
+    carbs_g REAL,             -- total carbohydrates per serving in grams
+    fat_g REAL,               -- fat per serving in grams
+    approach_type TEXT,       -- "keto"|"paleo-keto"|"carnivore"|"non-keto"|"technique"
+    cooking_method TEXT,      -- "skillet"|"instant-pot"|"oven"|"grill"|"air-fryer"|"smoker"|"bowl"|"no-cook"
+    difficulty_text TEXT,     -- Silverstein difficulty tier, e.g. "1 Piece of Cake"
     dietary_tags TEXT,
     notes_text TEXT,          -- concatenated *Note:*/*Tip:*/*Notes:*/*Cooking Tip:* lines, verbatim
     num_ingredients INTEGER,
@@ -259,6 +267,12 @@ _DIETARY_VOCAB = [
     "Nut-Free Option",
     "Nut-Free",
     "Oil-Free",
+    "Dairy-Free",
+    "Dairy-Free Option",
+    "Dairy-Optional",
+    "Vegetarian",
+    "Egg-Free",
+    "AIP",
 ]
 
 # Anchored at (stripped) line start so prose that merely contains these
@@ -292,6 +306,58 @@ _SERVES_NUM_RE = re.compile(
 _PREP_MIN_RE = re.compile(r"Prep\s*Time\s*:\s*(\d+)(?:\s*to\s*\d+)?\s*min", re.I)
 _COOK_MIN_RE = re.compile(r"Cook\s*Time\s*:\s*(\d+)(?:\s*to\s*\d+)?\s*min", re.I)
 _TOTAL_MIN_RE = re.compile(r"Total\s*Time\s*:\s*(\d+)(?:\s*to\s*\d+)?\s*min", re.I)
+
+# Keto-specific extraction patterns
+# Matches "8.7g net carbs", "8.7 g net carbs", "~8.7g net carbs"
+_NET_CARBS_RE = re.compile(r"~?(\d+\.?\d*)\s*g\s*net\s*carbs", re.I)
+# Matches Lima's full-macro format: "33g protein / 38g carbs / 15g fat | ~385 cal"
+_FULL_MACROS_RE = re.compile(
+    r"(\d+)\s*g\s*protein\s*/\s*(\d+)\s*g\s*carbs\s*/\s*(\d+)\s*g\s*fat\s*[|]\s*~?(\d+)\s*cal",
+    re.I,
+)
+# Matches Silverstein difficulty tier: "1 Piece of Cake", "2 Pieces of Cake", etc.
+_DIFFICULTY_RE = re.compile(r"(\d+\s+Pieces?\s+of\s+Cake)", re.I)
+# Matches standalone kcal: "385 kcal", "~385kcal"
+_KCAL_RE = re.compile(r"~?(\d[\d,]*)\s*kcal", re.I)
+
+# Author → approach_type mapping for keto-cooking wiki
+_AUTHOR_APPROACH = {
+    "menegaz": "keto",
+    "angell": "keto",
+    "dillard": "keto",
+    "bernardo": "keto",
+    "silverstein": "keto",
+    "holley": "keto",
+    "smythe": "keto",
+    "malakooti": "keto",
+    "vartanian": "paleo-keto",
+    "castaneda": "paleo-keto",
+    "preciado": "paleo-keto",
+    "blevins": "carnivore",  # Menegaz + Blevins → carnivore (handled below)
+    "lima": "non-keto",
+    "rodgers": "non-keto",
+    "sharp": "technique",
+    "longinidis": "technique",
+    "tabor": "technique",
+    "metaxa": "keto",       # Mihaela Metaxa-Albu (30-minute-keto-dinners)
+    "pierce": "keto",       # Emily Pierce (frugal-keto)
+    "cameron": "keto",      # Kassey Cameron (keto-basics, keto-meal-planning)
+    "azinge": "keto",       # Valerie Azinge (30-minute-keto-dinners co-author)
+}
+# Authors whose combo signals carnivore
+_CARNIVORE_PAIRS = {frozenset(["menegaz", "blevins"])}
+
+# Keywords for cooking_method detection (checked against lowercase body text)
+_COOKING_METHOD_KEYWORDS = [
+    ("instant-pot", ["instant pot", "instant-pot", "pressure cook"]),
+    ("air-fryer", ["air fry", "air-fry"]),
+    ("smoker", ["smoker", "smoke at", "smoked over"]),
+    ("grill", ["grill", "grilled", "grilling", "bbq", "live fire", "cast-iron grill"]),
+    ("oven", ["bake at", "baked at", "roast at", "roasted at", "oven", "375°f", "400°f", "425°f", "broil"]),
+    ("skillet", ["skillet", "cast-iron", "sauté", "saute", "pan-fry", "one-pan", "stir-fry"]),
+    ("bowl", ["bowl", "assembly", "assemble"]),
+    ("no-cook", ["no cooking", "no-cook", "no bake", "no-bake", "mix", "refrigerate"]),
+]
 
 
 def _parse_serves(yield_text):
@@ -533,6 +599,56 @@ def extract_records(wiki_root: Path):
             calorie_m = _CALORIE_RE.search(body)
             calories_text = calorie_m.group(0).strip(" *") if calorie_m else None
 
+            # Keto-specific numeric fields
+            net_carbs_g: float | None = None
+            protein_g: float | None = None
+            carbs_g: float | None = None
+            fat_g: float | None = None
+            calories_kcal: float | None = None
+
+            full_m = _FULL_MACROS_RE.search(body)
+            if full_m:
+                protein_g = float(full_m.group(1))
+                carbs_g = float(full_m.group(2))
+                fat_g = float(full_m.group(3))
+                calories_kcal = float(full_m.group(4))
+
+            net_m = _NET_CARBS_RE.search(body)
+            if net_m:
+                net_carbs_g = float(net_m.group(1))
+
+            if calories_kcal is None:
+                kcal_m = _KCAL_RE.search(body)
+                if kcal_m:
+                    calories_kcal = float(kcal_m.group(1).replace(",", ""))
+
+            # approach_type: derive from author name(s)
+            approach_type: str | None = None
+            if author:
+                author_lower = author.lower()
+                author_names = frozenset(
+                    w for w in re.split(r"[,;/&\s]+", author_lower) if len(w) > 2
+                )
+                if any(pair <= author_names for pair in _CARNIVORE_PAIRS):
+                    approach_type = "carnivore"
+                else:
+                    for name, atype in _AUTHOR_APPROACH.items():
+                        if name in author_lower:
+                            approach_type = atype
+                            break
+
+            # cooking_method: first match wins in priority order
+            body_lower = body.lower()
+            cooking_method: str | None = None
+            for method, keywords in _COOKING_METHOD_KEYWORDS:
+                if any(kw in body_lower for kw in keywords):
+                    cooking_method = method
+                    break
+
+            # difficulty_text: Silverstein's "N Piece(s) of Cake"
+            diff_m = _DIFFICULTY_RE.search(body)
+            difficulty_text = diff_m.group(1) if diff_m else None
+
             search_scope = description or ""
             tags = [t for t in _DIETARY_VOCAB if t.lower() in search_scope.lower()]
             # collapse "X Option" duplicates when the bare tag was also matched
@@ -574,6 +690,14 @@ def extract_records(wiki_root: Path):
                     "cook_minutes": cook_minutes,
                     "total_minutes": total_minutes,
                     "calories_text": calories_text,
+                    "calories_kcal": calories_kcal,
+                    "net_carbs_g": net_carbs_g,
+                    "protein_g": protein_g,
+                    "carbs_g": carbs_g,
+                    "fat_g": fat_g,
+                    "approach_type": approach_type,
+                    "cooking_method": cooking_method,
+                    "difficulty_text": difficulty_text,
                     "dietary_tags": dietary_tags,
                     "notes_text": notes_text,
                     "num_ingredients": num_ingredients,
